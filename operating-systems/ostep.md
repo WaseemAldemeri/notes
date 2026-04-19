@@ -4,6 +4,27 @@ by Remzi H. Arpaci-Dusseau & Andrea C. Arpaci-Dusseau
 
 > Free online at https://ostep.org
 
+<!-- vim-markdown-toc GFM -->
+
+* [Progress](#progress)
+* [Chapter 2: Introduction to Operating Systems](#chapter-2-introduction-to-operating-systems)
+* [Chapter 4: The Abstraction: The Process](#chapter-4-the-abstraction-the-process)
+* [Chapter 5: Interlude: Process API](#chapter-5-interlude-process-api)
+* [Chapter 6: Mechanism: Limited Direct Execution](#chapter-6-mechanism-limited-direct-execution)
+* [Chapter 7: Scheduling: Introduction](#chapter-7-scheduling-introduction)
+* [Chapter 13: The Abstraction: Address Spaces](#chapter-13-the-abstraction-address-spaces)
+* [Chapter 18: Paging: Introduction](#chapter-18-paging-introduction)
+* [Chapter 26: Concurrency: An Introduction](#chapter-26-concurrency-an-introduction)
+* [Chapter 28: Locks](#chapter-28-locks)
+* [Chapter 30: Condition Variables](#chapter-30-condition-variables)
+* [Chapter 31: Semaphores](#chapter-31-semaphores)
+* [Chapter 32: Common Concurrency Problems](#chapter-32-common-concurrency-problems)
+* [Chapter 36: I/O Devices](#chapter-36-io-devices)
+* [Chapter 39: Interlude: Files and Directories](#chapter-39-interlude-files-and-directories)
+* [Chapter 40: File System Implementation](#chapter-40-file-system-implementation)
+
+<!-- vim-markdown-toc -->
+
 ## Progress
 
 **Part I: Virtualization**
@@ -74,22 +95,6 @@ by Remzi H. Arpaci-Dusseau & Andrea C. Arpaci-Dusseau
 
 ## Chapter 5: Interlude: Process API
 
-<!-- vim-markdown-toc GFM -->
-
-* [Chapter 6: Mechanism: Limited Direct Execution](#chapter-6-mechanism-limited-direct-execution)
-* [Chapter 7: Scheduling: Introduction](#chapter-7-scheduling-introduction)
-* [Chapter 13: The Abstraction: Address Spaces](#chapter-13-the-abstraction-address-spaces)
-* [Chapter 18: Paging: Introduction](#chapter-18-paging-introduction)
-* [Chapter 26: Concurrency: An Introduction](#chapter-26-concurrency-an-introduction)
-* [Chapter 28: Locks](#chapter-28-locks)
-* [Chapter 30: Condition Variables](#chapter-30-condition-variables)
-* [Chapter 31: Semaphores](#chapter-31-semaphores)
-* [Chapter 32: Common Concurrency Problems](#chapter-32-common-concurrency-problems)
-* [Chapter 36: I/O Devices](#chapter-36-io-devices)
-* [Chapter 39: Interlude: Files and Directories](#chapter-39-interlude-files-and-directories)
-* [Chapter 40: File System Implementation](#chapter-40-file-system-implementation)
-
-<!-- vim-markdown-toc -->
 > **Takeaway:** 
 
 ## Chapter 6: Mechanism: Limited Direct Execution

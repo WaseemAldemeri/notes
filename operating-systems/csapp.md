@@ -4,6 +4,24 @@ by Randal E. Bryant & David R. O'Hallaron
 
 > Read after OSTEP. Goes deeper into systems from a programmer's viewpoint.
 
+<!-- vim-markdown-toc GFM -->
+
+* [Progress](#progress)
+* [Chapter 1: A Tour of Computer Systems](#chapter-1-a-tour-of-computer-systems)
+* [Chapter 2: Representing and Manipulating Information](#chapter-2-representing-and-manipulating-information)
+* [Chapter 3: Machine-Level Representation of Programs](#chapter-3-machine-level-representation-of-programs)
+* [Chapter 4: Processor Architecture](#chapter-4-processor-architecture)
+* [Chapter 5: Optimizing Program Performance](#chapter-5-optimizing-program-performance)
+* [Chapter 6: The Memory Hierarchy](#chapter-6-the-memory-hierarchy)
+* [Chapter 7: Linking](#chapter-7-linking)
+* [Chapter 8: Exceptional Control Flow](#chapter-8-exceptional-control-flow)
+* [Chapter 9: Virtual Memory](#chapter-9-virtual-memory)
+* [Chapter 10: System-Level I/O](#chapter-10-system-level-io)
+* [Chapter 11: Network Programming](#chapter-11-network-programming)
+* [Chapter 12: Concurrent Programming](#chapter-12-concurrent-programming)
+
+<!-- vim-markdown-toc -->
+
 ## Progress
 
 - [ ] Chapter 1: A Tour of Computer Systems
@@ -67,7 +85,4 @@ by Randal E. Bryant & David R. O'Hallaron
 
 ## Chapter 12: Concurrent Programming
 
-> **Takeaway:** 
-<!-- vim-markdown-toc GFM -->
-
-<!-- vim-markdown-toc -->
+> **Takeaway:**

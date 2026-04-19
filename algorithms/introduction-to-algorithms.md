@@ -4,11 +4,9 @@ by Thomas H. Cormen, Charles E. Leiserson, Ronald L. Rivest, Clifford Stein
 
 > Reference book. Look up specific algorithms and data structures as needed — do not read linearly.
 
-## Topics Index
-
-**Part I: Foundations**
 <!-- vim-markdown-toc GFM -->
 
+* [Topics Index](#topics-index)
 * [Chapter 3: Characterizing Running Times](#chapter-3-characterizing-running-times)
 * [Chapter 4: Divide-and-Conquer](#chapter-4-divide-and-conquer)
 * [Chapter 10: Elementary Data Structures](#chapter-10-elementary-data-structures)
@@ -20,6 +18,10 @@ by Thomas H. Cormen, Charles E. Leiserson, Ronald L. Rivest, Clifford Stein
 * [Chapter 22: Single-Source Shortest Paths](#chapter-22-single-source-shortest-paths)
 
 <!-- vim-markdown-toc -->
+
+## Topics Index
+
+**Part I: Foundations**
 - [ ] Chapter 1: The Role of Algorithms in Computing
 - [ ] Chapter 2: Getting Started
 - [ ] Chapter 3: Characterizing Running Times

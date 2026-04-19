@@ -4,6 +4,38 @@ by Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides (Gang of Four)
 
 > Reference book. Use alongside Head First Design Patterns for precise definitions.
 
+<!-- vim-markdown-toc GFM -->
+
+* [Patterns Index](#patterns-index)
+* [Creational Patterns](#creational-patterns)
+  * [Abstract Factory](#abstract-factory)
+  * [Builder](#builder)
+  * [Factory Method](#factory-method)
+  * [Prototype](#prototype)
+  * [Singleton](#singleton)
+* [Structural Patterns](#structural-patterns)
+  * [Adapter](#adapter)
+  * [Bridge](#bridge)
+  * [Composite](#composite)
+  * [Decorator](#decorator)
+  * [Facade](#facade)
+  * [Flyweight](#flyweight)
+  * [Proxy](#proxy)
+* [Behavioral Patterns](#behavioral-patterns)
+  * [Chain of Responsibility](#chain-of-responsibility)
+  * [Command](#command)
+  * [Interpreter](#interpreter)
+  * [Iterator](#iterator)
+  * [Mediator](#mediator)
+  * [Memento](#memento)
+  * [Observer](#observer)
+  * [State](#state)
+  * [Strategy](#strategy)
+  * [Template Method](#template-method)
+  * [Visitor](#visitor)
+
+<!-- vim-markdown-toc -->
+
 ## Patterns Index
 
 **Creational**
@@ -74,19 +106,6 @@ by Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides (Gang of Four)
 ### Chain of Responsibility
 
 ### Command
-<!-- vim-markdown-toc GFM -->
-
-* [Interpreter](#interpreter)
-* [Iterator](#iterator)
-* [Mediator](#mediator)
-* [Memento](#memento)
-* [Observer](#observer)
-* [State](#state)
-* [Strategy](#strategy)
-* [Template Method](#template-method)
-* [Visitor](#visitor)
-
-<!-- vim-markdown-toc -->
 
 ### Interpreter
 
