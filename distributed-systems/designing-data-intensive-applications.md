@@ -9,7 +9,10 @@ by Martin Kleppmann and Chris Riccomini
 * [Chapter 2: Defining Nonfunctional Requirements](#chapter-2-defining-nonfunctional-requirements)
 * [Chapter 3: Data Models and Query Languages](#chapter-3-data-models-and-query-languages)
 * [Chapter 4: Storage and Retrieval](#chapter-4-storage-and-retrieval)
+  * [Data Storage for Analytics](#data-storage-for-analytics)
+  * [Multidimensional and Full-Text Indexes](#multidimensional-and-full-text-indexes)
 * [Chapter 5: Encoding and Evolution](#chapter-5-encoding-and-evolution)
+  * [Dataflow modes — who encodes and who decodes](#dataflow-modes--who-encodes-and-who-decodes)
 * [Chapter 6: Replication](#chapter-6-replication)
 * [Chapter 7: Sharding](#chapter-7-sharding)
 * [Chapter 8: Transactions](#chapter-8-transactions)
@@ -25,9 +28,9 @@ by Martin Kleppmann and Chris Riccomini
 
 - [x] Chapter 1: Trade-Offs in Data Systems Architecture
 - [x] Chapter 2: Defining Nonfunctional Requirements
-- [ ] Chapter 3: Data Models and Query Languages
-- [ ] Chapter 4: Storage and Retrieval
-- [ ] Chapter 5: Encoding and Evolution
+- [x] Chapter 3: Data Models and Query Languages
+- [x] Chapter 4: Storage and Retrieval
+- [x] Chapter 5: Encoding and Evolution
 - [ ] Chapter 6: Replication
 - [ ] Chapter 7: Sharding
 - [ ] Chapter 8: Transactions
@@ -162,13 +165,117 @@ by Martin Kleppmann and Chris Riccomini
 
 > Even though the response to a GraphQL query looks similar to a response from a document database, and even though it has “graph” in its name, GraphQL can be implemented on top of any type of database—relational, document, or graph.
 
+> The idea of using events as the source of truth and expressing every state change as an event is known as event sourcing [65, 66]. The principle of maintaining separate read-optimized representations and deriving them from the write-optimized representation is called command query responsibility segregation (CQRS) [67]. These terms originated in the DDD community, although similar ideas have been around for a long time—e.g., in state machine replication
+
+> Event Sourcing summary: instead of storing only the current state of your data, you treat every state change as an immutable event and append it to a log — that log becomes the source of truth. Current state is just a derived view you rebuild by replaying events, and you can maintain multiple read-optimized projections from the same log (this split between the write-side log and read-side views is CQRS). The benefits are auditability, time-travel/debugging, and the flexibility to derive new representations later; the cost is more complexity and the need to handle schema evolution of old events.
+
+> The DataFrame data model is supported by the R language, the Pandas library for Python, Apache Spark, ArcticDB, Dask, and other systems. DataFrames are a popular tool for data scientists preparing data for training ML models, but they are also widely used for data exploration, statistical data analysis, data visualization, and similar purposes.
+
 ## Chapter 4: Storage and Retrieval
 
-> **Takeaway:** 
+> In principle, you could maintain a hash table on disk, but unfortunately it is difficult to make an on-disk hash map perform well. It requires a lot of random access I/O, it’s expensive to grow when it becomes full, and hash collisions require fiddly logic
+
+> In practice, hash tables are not used very often for database indexes. Instead, it is much more common to keep data in a structure that is sorted by key [3]. One example of such a structure is a Sorted Strings Table, or SSTable for short, as shown in Figure 4-2. This file format also stores key-value pairs, but it ensures that they are sorted by key, and each key appears only once in the file.
+
+LSM-tree storage engines (LevelDB, RocksDB, Cassandra) solve the "sorted-on-disk is great for reads but terrible for writes" problem by separating where writes land from where reads search: incoming writes go into an in-memory ordered structure called the *memtable* (a red-black tree, skip list, or trie — all kept sorted cheaply in RAM), and once it grows past a threshold it's flushed sequentially to disk as an immutable SSTable, while a fresh memtable takes over so writes never block. Reads check the memtable first, then walk newest-to-oldest through the SSTables until the key is found, with updates and deletes (tombstones) just being newer entries that shadow older ones. A background compaction process mergesorts overlapping SSTables together — cheap because each input is already sorted — discarding overwritten and deleted values to keep read amplification and disk usage bounded. Durability comes from a separate write-ahead log that every write is appended to before hitting the memtable, so a crash can be recovered by replaying the log; once a memtable is safely flushed, its portion of the log is discarded. The "tree" in LSM-tree is largely historical branding from the 1996 O'Neil paper — modern implementations have no single tree structure, just a tiered hierarchy of sorted files cascading through compaction levels.
+
+
+> Many databases run as a service that accepts queries over a network, but there are also embedded databases that don’t expose a network API. Instead, they are libraries that run in the same process as your application code, typically reading and writing files on the local disk, and you interact with them through normal function calls. Examples of embedded storage engines include RocksDB, SQLite, LMDB, DuckDB, and KùzuDB 
+
+> o make the database resilient to crashes, it is common for B-tree implementations to include an additional data structure on disk: a write-ahead log (WAL). This is an append-only file to which every B-tree modification must be written before it can be applied to the pages of the tree itself. When the database comes back up after a crash, this log is used to restore the B-tree back to a consistent state [2, 24]. In filesystems, the equivalent mechanism is known as journaling.
+
+> As a rule of thumb, LSM-trees are better suited for write-heavy applications, whereas B-trees are faster for reads
+
+> Range queries are simple and fast on B-trees, as they can make use of the sorted structure of the tree. On LSM storage, range queries can also take advantage of the SSTable sorting, but they need to scan all the segments in parallel and combine the results. Bloom filters don’t help for range queries (since you would need to compute the hash of every possible key within the range, which is impractical), making range queries more expensive than point queries in the LSM approach
+
+Indexes summary: only the primary key is indexed automatically. Every other column — including foreign keys — is a sequential scan unless you add an index. An index is a separate on-disk data structure (typically a B-tree, or a stack of SSTables for LSM engines) that keeps one column sorted and supports `O(log n)` lookups, range scans, and inserts. The cost: extra disk space proportional to the indexed column, plus a write-amplification tax — every `INSERT`/`UPDATE`/`DELETE` has to update every relevant index. So indexes are a read-vs-write trade-off: you pay on writes to make specific reads fast, and the art is picking *which* columns deserve that tax based on actual query patterns. Secondary indexes differ from primary indexes in that their values aren't unique, so the leaf entry is either a list of row pointers, a pointer to the row in a heap file (Postgres), or the primary key requiring a second lookup (InnoDB). Variants like *partial indexes* (index only rows matching a `WHERE` clause) and *covering indexes* (include extra columns so queries never touch the table) widen the trade-off space.
+
+### Data Storage for Analytics
+
+> a data warehouse and a relational OLTP database look similar, because they both have a SQL query interface. However, the internals of the systems can look quite different, because they are optimized for very different query patterns.
+
+
+> Although fact tables are often over one hundred columns wide, a typical data warehouse query accesses only four or five of them at one time ... a row-oriented storage engine still needs to load all those rows (each consisting of over 100 attributes) from disk into memory, parse them, and filter out those that don't meet the required conditions.
+
+> The idea behind column-oriented (or columnar) storage is simple: instead of storing all the values from one row together, store all the values from each column together instead. If each column is stored separately, a query needs to read and parse only those columns that are used in that query
+
+> we can further reduce the demands on disk throughput and network bandwidth by compressing data ... Often the number of distinct values in a column is small compared to the number of rows ... We can now take a column with n distinct values and turn it into n separate bitmaps
+
+
+Object storage aside (not in DDIA): **object storage** (S3, GCS, Azure Blob) stores data as discrete blobs in a flat key→bytes namespace, accessed over HTTP. Unlike block storage (raw device, random read/write) or file storage (POSIX directories), objects are immutable in practice — you replace the whole object, not edit bytes in place. Properties that make it the substrate for cloud warehouses: very cheap (~$0.02/GB/mo), effectively infinite capacity, 11 nines durability via automatic replication, massive aggregate throughput, but high per-request latency (tens of ms). That latency profile is fine for "read a 100 MB Parquet file" but useless for OLTP. Immutability is also why analytical formats (Parquet) are write-once and table formats (Iceberg, Delta) layer inserts/deletes/transactions on top by tracking which files make up a table at each version. Mental model: a giant HTTP-addressable KV store where values are large files, optimized for throughput and durability over latency or in-place edits.
+
+Postgres aside (not in DDIA): **TOAST** = "The Oversized-Attribute Storage Technique." Values too big for an 8 KB page (>~2 KB) get compressed and/or moved to a side table, with a pointer in the main row. So `SELECT *` and `SELECT x, y, z` read the same heap pages, but `*` additionally chases TOAST pointers for any large columns — a narrow projection skips that, plus enables index-only scans and cuts network/sort/hash work downstream.
+
+### Multidimensional and Full-Text Indexes
+
+B-trees and LSM-trees are 1D — they sort by a single key. A concatenated index `(lastname, firstname)` works left-to-right only: it can find all Smiths but not all Johns. The moment you need to filter on multiple dimensions *simultaneously*, ordered single-key indexes break down.
+
+**Multidimensional indexes** — for queries like "restaurants in this lat/lon box" or "(date, temperature)" ranges. Two practical options: encode coordinates onto a 1D space-filling curve (Z-order, Hilbert) and use a normal B-tree, or use a real spatial index (R-tree, Bkd-tree). PostGIS = R-trees over Postgres GiST. Reach for these when both dimensions are equally selective.
+
+**Full-text search** = the same idea taken to thousands of dimensions, where each term is a dimension. The data structure is the **inverted index**: term → postings list (IDs of documents containing it). "Docs with X AND Y" = bitwise AND of two postings bitmaps — same trick as columnar bitmap indexes. Lucene (Elasticsearch, Solr) stores postings in SSTable-like sorted files with LSM-style merging; Postgres GIN does the same. **n-gram/trigram** indexes index every length-n substring instead of words, enabling substring and regex search at the cost of size (Postgres `pg_trgm`). Lucene supports typo-tolerant search via finite-state automata + Levenshtein automata.
+
+**Vector embeddings (semantic search)** — embedding models (Word2Vec, BERT, GPT, multimodal) map text/images/audio to a 1,000+ dimensional float vector where semantic neighbors end up geometrically close (cosine similarity / Euclidean distance). R-trees fail in high dimensions, so vector indexes use specialized structures: **Flat** (brute-force, accurate but O(N)), **IVF** (cluster space into centroids, query nearest partitions; tunable via "probes"), **HNSW** (multi-layer proximity graph, descend from sparse top to dense bottom — fastest in practice). Both IVF and HNSW are *approximate*. Implementations: Faiss, pgvector, and every vector DB (Pinecone, Weaviate, Milvus, Chroma). Terminology gotcha: "vectorized processing" (SIMD batches) and "vector embeddings" (semantic floats) are unrelated meanings of "vector."
+
+Practical takeaway: index design follows query shape. One column, range queries → B-tree/LSM. Two-or-three structured dimensions → R-tree or geohash. Keyword search → inverted index. "Find similar meaning" → ANN vector index (HNSW by default). The same primitives — sorted runs, postings lists, bitmaps, hierarchical partitioning — keep recombining.
 
 ## Chapter 5: Encoding and Evolution
 
-> **Takeaway:** 
+> With server-side applications you may want to perform a rolling upgrade (also• known as a staged rollout), deploying the new version to a few nodes at a time, monitoring whether it runs smoothly, and gradually working your way through 161 all the nodes.
+
+> Backward compatibility Ensures that newer code can read data written by older code. Forward compatibility Ensures that older code can read data written by newer code
+
+> When you want to write data to a file or send it over the network, you have to encode it as some kind of self-contained sequence of bytes (e.g., a JSON document). Since a pointer wouldn’t make sense to any other process
+
+>  The translation from the in-memory representation to a byte sequence is called encoding (also known as serialization or marshaling), and the reverse is called decoding (aka parsing, deserialization, or unmarshaling).
+
+ IDL (Interface Definition Language): a language-neutral, formal description of data structures and/or service interfaces. An IDL specifies what an interface looks like — its types, fields, methods, and contracts — without committing to any particular implementation language. IDL definitions can be consumed in several ways: generating code (stubs, types, serializers) in target languages, validating messages at runtime, driving documentation, or enabling contract testing between independently developed components. Examples: Protobuf, Thrift, Avro, OpenAPI, GraphQL SDL, WSDL, CORBA IDL.
+
+> Protobufs IDL schema defines the fields of each record and their types, but it does not support other restrictions on the possible values of fields.
+
+> When HTTP is used as the underlying protocol for talking to the service, it is called a web service.
+
+> The most popular service design philosophy is REST, which builds upon the prin‐ ciples of HTTP [31, 32]. REST emphasizes simple data formats, using URLs for identifying resources and using HTTP features for cache control, authentication, and content type negotiation. An API designed according to the principles of REST is called RESTful
+
+> Code that needs to invoke a web service API must know which HTTP endpoint to query, and what data format to send and expect in response. Even if a service adopts RESTful design principles, clients need to somehow find out these details. Service developers often use an IDL to define and document their service’s API endpoints and data models, and to evolve them over time. Other developers can then use the service definition to determine how to query the service. The two most popular service IDLs are OpenAPI (also known as Swagger [33]), used for web services that send and receive JSON, and Protocol Buffers, used for gRPC services.
+
+Encoding formats summary: **Language-specific** (Java Serializable, Python pickle, Ruby Marshal) — convenient but tied to one language, insecure (decoding arbitrary classes = RCE risk), versioning is an afterthought. **JSON/XML/CSV** — human-readable, universal, but ambiguous about types (no int vs float in JSON, no binary strings without Base64), CSV has no schema. Good for cross-org data exchange where format agreement matters more than efficiency. **Binary JSON variants** (MessagePack, CBOR, BSON) — modestly smaller, still must embed field names. **Schema-driven binary** (Protobuf, Thrift, Avro) — most compact, schema doubles as documentation, well-defined evolution rules, code generation for typed languages.
+
+Protobuf vs Avro on schema evolution:
+- **Protobuf** identifies fields by **tag numbers** in the schema. Field name changes are free; tag numbers are forever. Adding a field = pick a new tag (old code skips unknown tags using the type annotation — forward compat). Removing a field = retire the tag, never reuse it. New fields must be optional or have a default for backward compat. Datatype widening (int32→int64) works one direction but truncates the other.
+- **Avro** has **no tag numbers** — the encoded bytes are just values concatenated in schema order, with no field identifiers or type tags inline. Decoding requires both the **writer's schema** (used to encode) and the **reader's schema** (what the app expects). Avro resolves them: fields matched by name, missing fields filled from reader's defaults, fields the reader doesn't know are skipped. To stay compatible, you can only add/remove fields that have a default value. Field renames use **aliases** in the reader's schema (backward compat only). Null requires an explicit `union { null, T }`.
+
+> ⇒ Avro's killer feature: **dynamically generated schemas**. Because there are no tag numbers to assign by hand, you can auto-generate an Avro schema from, e.g., a relational DB schema and re-export every time the source schema changes — readers match by name. Protobuf needs manual tag assignment, so this doesn't work cleanly.
+
+> Schema evolution allows the same kind of flexibility as schemaless/schema-on-read JSON databases provide ... while also providing better guarantees about your data and better tooling.
+
+### Dataflow modes — who encodes and who decodes
+
+> data outlives code
+
+**Databases** — writer encodes, reader decodes. Need *both* directions: backward compat (future code reads old data — five-year-old rows are still in their original encoding) AND forward compat (during a rolling upgrade, an old node may read data a new node wrote). Big gotcha (Figure 5-1): an old reader that decodes into a typed object, mutates it, and writes it back can **silently drop fields it didn't know about**. Encoders/ORMs need to round-trip unknown fields. LSM compaction and "ALTER TABLE ADD COLUMN with NULL default" let DBs *appear* schema-uniform without rewriting old data — old rows get nulls filled in at read time. Archival snapshots are a free opportunity to re-encode everything in the latest schema (and maybe switch to Parquet for analytics).
+
+**Services (REST/RPC)** — request encoded by client, decoded by server; response goes the other way. Simplifying assumption vs DBs: **servers usually upgrade before clients**, so you need backward compat on requests and forward compat on responses. Across org boundaries (public APIs) you may have to maintain compat indefinitely, often by running multiple API versions side-by-side (URL path version, `Accept` header, etc.).
+
+> The RPC model tries to make a request to a remote network service look the same as calling a function or method, within the same process (this abstraction is called **location transparency**). Although this seems convenient at first, the approach is fundamentally flawed.
+
+
+**Service discovery / load balancing spectrum**: 
+
+  - Hardcoded IP — works for one box, breaks the moment anything moves.
+  - DNS — names instead of IPs, but cached and slow to update.
+  - NGINX/HAProxy — a dedicated middle box, smart and fast, but its backend list is static and every request takes an extra hop.
+  - Service registry — instances register themselves, clients (or LBs) read the registry; the dynamic-environment problem is solved.
+  - Service mesh — registry + per-pod sidecar proxies + central control plane; pushes discovery, security, and observability out of app code into the platform.
+
+
+
+**Durable execution / workflows** (Temporal, Restate, Airflow, Dagster) — model a multi-step business process (workflow) as a graph of tasks/activities. The framework logs every RPC and state change to a WAL, so on retry it **replays from the log** and skips already-completed side effects, giving exactly-once semantics across third-party services that can't be wrapped in a DB transaction. Constraints: external APIs must be idempotent (use unique IDs); replay requires deterministic code (no `random()`, no `time.now()` — use the framework's deterministic versions); reordering function calls in a deployed workflow can break in-flight executions, so you deploy new versions side-by-side and let old invocations finish on the old code.
+
+**Event-driven (message brokers, actors)** — sender encodes a message and hands it to a broker (Kafka, RabbitMQ, NATS, SQS, Pub/Sub); broker stores temporarily and delivers to one or more consumers asynchronously. Broker advantages over direct RPC: buffering when consumer is down, automatic redelivery on crash, no service discovery needed, fan-out to multiple subscribers, sender/receiver decoupled. Two delivery patterns: **queue** (one consumer wins each message) vs **topic/pub-sub** (all subscribers get a copy). Brokers are payload-agnostic — same Protobuf/Avro/JSON + schema-registry story applies. Same forward-compat trap as DBs: a consumer that re-publishes messages must preserve unknown fields.
+
+**Distributed actors** (Akka, Erlang/OTP, Orleans) — actor model (single-threaded actors with private state, communicating via async messages) extended across a cluster. Same encode-on-send/decode-on-receive story, but location transparency works *better* here than in RPC because the actor model already assumes messages can be lost — there's no fundamental mismatch between local and remote messaging. Rolling upgrades still need forward/backward compat on the message types.
+
+> **Takeaway:** Rolling upgrades + "data outlives code" mean any non-trivial system has multiple code versions and multiple data-format versions in flight simultaneously. The discipline of forward + backward compatibility — across DBs, RPC, message brokers, and workflow replays — is what lets a team deploy frequently without coordinating a big-bang upgrade. Schema-driven binary formats (Protobuf for hand-curated APIs, Avro when the schema is dynamically generated, e.g. from a DB) make those compat properties explicit and machine-checkable; JSON gives you flexibility but pushes the compat reasoning into your head.
 
 ## Chapter 6: Replication
 
