@@ -14,6 +14,7 @@ by Martin Kleppmann and Chris Riccomini
 * [Chapter 5: Encoding and Evolution](#chapter-5-encoding-and-evolution)
   * [Dataflow modes — who encodes and who decodes](#dataflow-modes--who-encodes-and-who-decodes)
 * [Chapter 6: Replication](#chapter-6-replication)
+  * [Single-Leader Replication](#single-leader-replication)
 * [Chapter 7: Sharding](#chapter-7-sharding)
 * [Chapter 8: Transactions](#chapter-8-transactions)
 * [Chapter 9: The Trouble with Distributed Systems](#chapter-9-the-trouble-with-distributed-systems)
@@ -278,6 +279,37 @@ Protobuf vs Avro on schema evolution:
 > **Takeaway:** Rolling upgrades + "data outlives code" mean any non-trivial system has multiple code versions and multiple data-format versions in flight simultaneously. The discipline of forward + backward compatibility — across DBs, RPC, message brokers, and workflow replays — is what lets a team deploy frequently without coordinating a big-bang upgrade. Schema-driven binary formats (Protobuf for hand-curated APIs, Avro when the schema is dynamically generated, e.g. from a DB) make those compat properties explicit and machine-checkable; JSON gives you flexibility but pushes the compat reasoning into your head.
 
 ## Chapter 6: Replication
+
+Replication = keeping the same data on multiple machines connected by a network. Three motivations: **lower latency** (data near users), **availability/durability** (survive node failure), **read throughput** (scale out reads). The hard part isn't copying static data — it's propagating *changes*. Three families cover almost all systems: **single-leader, multi-leader, leaderless**. Backups are not a substitute: replicas propagate `DELETE`s, backups don't.
+
+### Single-Leader Replication
+
+One replica is the **leader** (primary); all writes go there. Leader writes locally, then ships changes to **followers** via a replication log. Reads can hit leader or any follower; writes only the leader. If the DB is sharded, each shard has its own leader. Used by Postgres, MySQL, Oracle, MongoDB, DynamoDB, Kafka, and consensus-based systems (Raft → CockroachDB, TiDB, etcd).
+
+**Sync vs async vs semi-sync.** Sync follower is guaranteed up-to-date but blocks all writes if it stalls — impractical for *all* followers. Async never blocks but loses writes if the leader dies before replicating. **Semi-synchronous** (the real-world default) makes one follower sync and the rest async — guarantees data on ≥2 nodes without grinding to a halt. A *majority quorum* (e.g., 3 of 5 sync) is the consensus-protocol variant.
+
+**Adding a follower without downtime.** Snapshot the leader at a known log position → copy snapshot to new follower → follower replays the replication log from that position to catch up.
+
+**Handling outages.** Follower failure is easy: resume from its last log position. **Leader failover** is the hard one — detect death (timeout tuning is tricky), elect a new leader, reconfigure clients/followers. Failure modes: lost writes if async (new leader missing recent writes), **split brain** (two leaders both accept writes), bad timeouts (too short → spurious failover, too long → user-visible downtime). Often handled manually because automatic failover is dangerous.
+
+**Replication log implementations** — four approaches, each with one gotcha:
+
+| Approach | How | Gotcha |
+|---|---|---|
+| **Statement-based** | ship SQL | nondeterminism (`NOW()`, `RAND()`), autoincrement, side effects |
+| **WAL shipping** | ship low-level byte changes | tightly couples replicas to storage format → blocks zero-downtime version upgrades |
+| **Logical (row-based)** | ship row-level changes (Postgres logical decoding, MySQL binlog row format) | *modern default*; decoupled from storage; also enables CDC |
+| **Trigger-based** | application-level capture | flexible but slow and bug-prone |
+
+**Eventual consistency**: With async replication, followers lag the leader by some amount (usually <1s, but unbounded — minutes during recovery, congestion, or partitions). A read from a follower may return stale data, but if writes stop, all replicas eventually converge to the same state. The guarantee is *only* about the limit: it says nothing about *how* stale a read can be or when the staleness ends. The anomalies below are the user-visible failure modes of that weak guarantee.
+
+**Problems with replication lag** — the eventual-consistency anomalies. Most interview-relevant part of the section:
+
+| Anomaly | What user sees | Fix |
+|---|---|---|
+| **Read-your-writes** | User updates profile, then sees the old version | Read recent writes from leader; or track write timestamp and read from a follower caught up to it |
+| **Monotonic reads** | Time goes backward — second read older than first | Pin user to one replica (e.g., hash user ID → replica) |
+| **Consistent prefix reads** | See answer before question (causality violation) | Route causally related writes to same partition, or carry causal-tracking metadata |
 
 > **Takeaway:** 
 

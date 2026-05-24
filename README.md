@@ -22,6 +22,7 @@ Technical book notes organized by topic.
 
 - [Designing Data-Intensive Applications](distributed-systems/designing-data-intensive-applications.md)
 - [Understanding Distributed Systems](distributed-systems/understanding-distributed-systems.md)
+- [Event-Driven Architecture — Patterns & Terminology](distributed-systems/event-driven-architecture.md) *(synthesis note)*
 
 ## Software Engineering
 
